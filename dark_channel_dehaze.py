@@ -133,6 +133,12 @@ def transmission_redifine(I,t):
     
 def recover(I,t,A,tx=0.1):
     """
+    J=(I-A)/t+A
+    参数I：输入图像
+    参数t：折射率
+    参数A：大气光强
+    参数tx：折射率阈值
+    返回值res：恢复图像
     recover
     :param I: input image
     :param t: transmission
@@ -155,6 +161,9 @@ if __name__ == '__main__':
     cv2.imshow('I_dark',I_dark)
     A=get_atomspheric(I)
     t=get_transmission(I,A)
+    res=recover(I,t,A)
+    cv2.imwrite('./image/recoverWithoutGuide.jpg',res)
+    cv2.imshow('res',res)
 
     t=transmission_redifine(I,t)
     res=recover(I,t,A)
