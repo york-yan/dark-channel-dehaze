@@ -2,6 +2,9 @@ import numpy as np
 import cv2
 from scipy import signal
 from skimage.metrics import structural_similarity as ssim
+import pyiqa
+import sys
+sys.path.append('../')
 
 def dark_channel(I,r):
     """
@@ -157,16 +160,14 @@ def recover(I,t,A,tx=0.1):
 
 
 def calculate_psnr(original_image, reconstructed_image):
-    # type of original_image and reconstructed_image should be float32
-    original_image = original_image.astype(np.float32)
-    reconstructed_image = reconstructed_image.astype(np.float32)
-
-    # MSE
-    mse = np.mean((original_image - reconstructed_image) ** 2)
-
-    # PSNR
-    max_pixel_value = 255.0
-    psnr = 10 * np.log10((max_pixel_value ** 2) / mse)
+    """
+    calculate psnr
+    :param original_image: original image
+    :param reconstructed_image: reconstructed image
+    """
+    psnr_metric=pyiqa.create_metric('psnr').cuda()
+    psnr_score=psnr_metric(reconstructed_image,original_image)
+    psnr=psnr_score.item()
 
     return psnr
 
@@ -177,43 +178,13 @@ def calculate_ssim(original_image, reconstructed_image):
     :param reconstructed_image: reconstructed image
     :return: ssim
     """
-    # 原始图像和重建图像的数据类型应为 float32
-    original_image = original_image.astype(np.float32)
-    reconstructed_image = reconstructed_image.astype(np.float32)
-
-    print(original_image.shape, reconstructed_image.shape)
-    # 常量
-    K1 = 0.01
-    K2 = 0.03
-
-    # 均值、方差、协方差
-    mu_original = signal.convolve2d(original_image, np.ones((8, 8))/64, mode='valid')
-    mu_reconstructed = signal.convolve2d(reconstructed_image, np.ones((8, 8))/64, mode='valid')
-
-    sigma_original_sq = signal.convolve2d((original_image - mu_original)**2, np.ones((8, 8))/64, mode='valid')
-    sigma_reconstructed_sq = signal.convolve2d((reconstructed_image - mu_reconstructed)**2, np.ones((8, 8))/64, mode='valid')
-    sigma_original_reconstructed = signal.convolve2d((original_image - mu_original) * (reconstructed_image - mu_reconstructed), np.ones((8, 8))/64, mode='valid')
-
-    # SSIM 公式
-    numerator = (2 * mu_original * mu_reconstructed + K1) * (2 * sigma_original_reconstructed + K2)
-    denominator = (mu_original**2 + mu_reconstructed**2 + K1) * (sigma_original_sq + sigma_reconstructed_sq + K2)
-
-    ssim_map = numerator / denominator
-
-    # 整体 SSIM
-    ssim_value = np.mean(ssim_map)
+    ssim_metric=pyiqa.create_metric('ssim').cuda()
+    ssim_score=ssim_metric(reconstructed_image,original_image)
+    ssim_value=ssim_score.item()
 
     return ssim_value
 
-def calculate_ssim_color(original_image, reconstructed_image):
-    # 转换图像数据类型为浮点型
-    original_image = original_image.astype(np.float64)
-    reconstructed_image = reconstructed_image.astype(np.float64)
 
-    # 计算 SSIM
-    ssim_index, _ = ssim(original_image, reconstructed_image,winsize=1, full=True)
-
-    return ssim_index
 
 
 if __name__ == '__main__':
@@ -231,14 +202,12 @@ if __name__ == '__main__':
     t=transmission_redifine(I,t)
     res=recover(I,t,A)
     cv2.imwrite('./image/recoverWithGuide.jpg',res) 
-    out=cv2.imread('./image/recoverWithGuide.jpg')
-    psnr = calculate_psnr(I, out)
-    print("PSNR: ", psnr)
-    I_gray=cv2.cvtColor(I,cv2.COLOR_BGR2GRAY)
-    out_gray=cv2.cvtColor(out,cv2.COLOR_BGR2GRAY)
-    ssim_index = calculate_ssim(I_gray, out_gray)
-    print("SSIM: ", ssim_index)
-
     cv2.imshow('res',res)
+    
+    original_image='./image/a.jpg'
+    dehaze_image='./image/recoverWithGuide.jpg'
+    psnr_score=calculate_psnr(original_image, dehaze_image)
+    ssim_score=calculate_ssim(original_image, dehaze_image)
+    print(f"PSNR: {psnr_score}", f"SSIM: {ssim_score}")
 
     cv2.waitKey()
